@@ -1,14 +1,10 @@
 package com.perspective.securitytrainer.configuration;
 
 import com.google.common.collect.Sets;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import java.util.Set;
+import java.util.stream.Collectors;
 
-import java.security.Signature;
-import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 import static com.perspective.securitytrainer.configuration.ApplicationUserPermission.*;
 
