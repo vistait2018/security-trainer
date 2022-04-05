@@ -1,23 +1,23 @@
 package com.perspective.securitytrainer.configuration;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import com.perspective.securitytrainer.auth.ApplicationUserService;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
+
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.provisioning.InMemoryUserDetailsManager;
-import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
-import org.springframework.security.web.util.matcher.AndRequestMatcher;
+
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
 import java.util.concurrent.TimeUnit;
+
+import static com.perspective.securitytrainer.configuration.ApplicationUserRole.STUDENT;
 
 @Configuration
 @EnableWebSecurity
@@ -25,80 +25,59 @@ import java.util.concurrent.TimeUnit;
 public class ApplicationSecurityConfig  extends WebSecurityConfigurerAdapter {
 
     private PasswordEncoder passwordEncoder;
+    private ApplicationUserService applicationUserService;
 
-    public ApplicationSecurityConfig(PasswordEncoder passwordEncoder) {
+    public ApplicationSecurityConfig(PasswordEncoder passwordEncoder,
+                                     ApplicationUserService applicationUserService) {
         this.passwordEncoder = passwordEncoder;
+        this.applicationUserService = applicationUserService;
     }
 
     @Override
     protected void configure(HttpSecurity httpSecurity) throws Exception{
         httpSecurity
-               // .csrf().csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
-               // .and()
                 .csrf().disable()
                 .authorizeRequests()
-                //exemptinpting a url
-                .antMatchers("/","/css/*","/js/*").permitAll()
-                //using Role
-                .antMatchers("/api/v1/**").hasRole(ApplicationUserRole.STUDENT.name()) //Role base Authentication
-
-                //Using permisions
-               /* .antMatchers(HttpMethod.GET,"/management/api/v1/**").hasAuthority(ApplicationUserPermission.COURSE_WRITE.getPermission())
-                .antMatchers(HttpMethod.PUT,"/management/api/v1/**").hasAuthority(ApplicationUserPermission.COURSE_WRITE.getPermission())
-                .antMatchers(HttpMethod.POST,"/management/api/v1/**").hasAuthority(ApplicationUserPermission.COURSE_WRITE.getPermission())
-                .antMatchers(HttpMethod.GET,"/management/api/v1/**").hasAnyRole(ApplicationUserRole.ADMIN.name(),ApplicationUserRole.ADMINTRAINEE.name())*/
+                .antMatchers("/", "index", "/css/*", "/js/*").permitAll()
+                .antMatchers("/api/**").hasRole(STUDENT.name())
                 .anyRequest()
                 .authenticated()
                 .and()
                 .formLogin()
                 .loginPage("/login")
-                   .permitAll()
-                   .defaultSuccessUrl("/courses",true)
-                   .passwordParameter("password") //to change password name
-                   .usernameParameter("username")  // to change username
-                   .and()
-                    .rememberMe()// default to two weeks
-                              .tokenValiditySeconds((int)TimeUnit.DAYS.toSeconds(21))// extend session with remember-me
-                              .key("somethingverysecure")
-                             .rememberMeParameter("remember-me") // to change remember-me
+                .permitAll()
+                .defaultSuccessUrl("/courses", true)
+                .passwordParameter("password")
+                .usernameParameter("username")
+                .and()
+                .rememberMe()
+                .tokenValiditySeconds((int) TimeUnit.DAYS.toSeconds(21))
+                .key("somethingverysecured")
+                .rememberMeParameter("remember-me")
                 .and()
                 .logout()
-                .logoutRequestMatcher(new AntPathRequestMatcher("/logout","GET"))// use this if csrf is diabled
-                    .clearAuthentication(true)
-                    .invalidateHttpSession(true)
-                    .deleteCookies("JSESSIONID","remember-me")
-                    .logoutSuccessUrl("/login");
-                //.httpBasic();
+                .logoutUrl("/logout")
+                .logoutRequestMatcher(new AntPathRequestMatcher("/logout", "GET")) // https://docs.spring.io/spring-security/site/docs/4.2.12.RELEASE/apidocs/org/springframework/security/config/annotation/web/configurers/LogoutConfigurer.html
+                .clearAuthentication(true)
+                .invalidateHttpSession(true)
+                .deleteCookies("JSESSIONID", "remember-me")
+                .logoutSuccessUrl("/login");
 
 
+    }
+
+
+    @Override
+    protected void configure(AuthenticationManagerBuilder auth) throws Exception {
+        auth.authenticationProvider(daoAuthenticationProvider());
     }
 
     @Bean
-    @Override
-    protected UserDetailsService userDetailsService(){
-
-        UserDetails annahSmith = User.builder()
-                .username("annahSmith")
-                .password(passwordEncoder.encode("password"))
-                .roles(ApplicationUserRole.STUDENT.name())//ROLE_STUDENT
-                .authorities(ApplicationUserRole.STUDENT.getGrantedAuthorities()) // permisssion
-                .build();
-
-        UserDetails lindaUser = User.builder()
-                .username("linda")
-                .password(passwordEncoder.encode("password"))
-                .roles(ApplicationUserRole.ADMIN.name())//ROLE_ADMIN
-                .authorities(ApplicationUserRole.ADMIN.getGrantedAuthorities())//Perissions
-                .build();
-
-        UserDetails tomUser = User.builder()
-                .username("tom")
-                .password(passwordEncoder.encode("password"))
-                .roles(ApplicationUserRole.ADMINTRAINEE.name())//ROLE_TRAINEE
-                .build();
-      return new InMemoryUserDetailsManager(
-              annahSmith,lindaUser,tomUser
-      );
-
+    public DaoAuthenticationProvider daoAuthenticationProvider() {
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
+        provider.setPasswordEncoder(passwordEncoder);
+        provider.setUserDetailsService(applicationUserService);
+        return provider;
     }
+
 }
